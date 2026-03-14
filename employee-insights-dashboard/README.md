@@ -1,16 +1,77 @@
-# React + Vite
+# Employee Insights Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A 4-screen React dashboard focused on auth, virtualization, native camera capture, signature overlays, and SVG analytics.
 
-Currently, two official plugins are available:
+## Credentials
+- Username: `testuser`
+- Password: `Test123`
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Screen-by-screen implementation
 
-## React Compiler
+### 1) Secure Authentication (`/login`)
+- Context-based auth provider with persistent session in `localStorage`.
+- Route guard redirects unauthenticated users away from protected routes.
+- Reload-safe: once logged in, refresh keeps the user session active.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 2) High-Performance Grid (`/list`)
+- Fetches employee data using:
+  - `POST https://backend.jotish.in/backend_dev/gettabledata.php`
+  - payload `{ "username": "test", "password": "123456" }`
+- Custom virtualization (no windowing libraries): only viewport rows + buffer are rendered.
 
-## Expanding the ESLint configuration
+### 3) Identity Verification (`/details/:id`)
+- Native camera capture using `navigator.mediaDevices.getUserMedia`.
+- Signature capture on top of the photo via HTML Canvas (mouse + touch).
+- Merge step combines photo + signature into one final DataURL image.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 4) Analytics + Audit Result (`/analytics`)
+- Displays merged audit image.
+- Custom salary chart drawn with raw SVG bars.
+- Custom geospatial city map via SVG shape + city coordinate points.
+
+## Virtualization math (core logic)
+- `ROW_HEIGHT = 64`
+- `VIEWPORT_HEIGHT = 480`
+- `BUFFER_ROWS = 6`
+
+For `N` rows and current `scrollTop`:
+1. `startIndex = max(0, floor(scrollTop / ROW_HEIGHT) - BUFFER_ROWS)`
+2. `visibleCount = ceil(VIEWPORT_HEIGHT / ROW_HEIGHT) + 2 * BUFFER_ROWS`
+3. `endIndex = min(N, startIndex + visibleCount)`
+4. Render only `rows[startIndex...endIndex)`
+5. Simulate full scroll height with padding:
+   - `paddingTop = startIndex * ROW_HEIGHT`
+   - `paddingBottom = totalHeight - endIndex * ROW_HEIGHT`
+
+This keeps DOM node count stable while preserving natural scrollbar behavior.
+
+## Intentional Vulnerability (required)
+
+> Exactly one intentional bug is included in this submission.
+
+### Bug type
+Performance bug (memory leak).
+
+### Where
+`src/pages/DetailsPage.jsx` in the `useEffect` that adds a `window.resize` listener.
+
+### What is wrong
+The listener is registered but never removed on unmount.
+Repeated navigation to and from `/details/:id` can accumulate listeners and degrade performance over time.
+
+### Why included
+The assignment explicitly requires one intentional logic/performance issue to be documented.
+I chose a contained memory leak that is easy to explain and verify during review.
+
+## Run locally
+```bash
+npm install
+npm run dev
+```
+
+## Suggested recording walkthrough
+1. Login flow + auth guard (open `/list` while logged out).
+2. Virtualized list behavior while scrolling.
+3. Camera capture + signature draw + merge.
+4. Analytics page (audit image + SVG chart + SVG map).
+5. 60-second explainer: image merge pipeline + virtualization offset math.
