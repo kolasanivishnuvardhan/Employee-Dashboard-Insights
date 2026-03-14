@@ -1,52 +1,150 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppData } from '../context/AppDataContext'
+import { fetchEmployeesFromApi } from '../utils/employeeData'
 import { navigate } from '../utils/router'
 
 export function DetailsPage({ employeeId }) {
-  const { employees, selectedEmployee, setSelectedEmployee, setMergedImage } =
+  const {
+    employees,
+    setEmployees,
+    selectedEmployee,
+    setSelectedEmployee,
+    setMergedImage,
+  } =
     useAppData()
-  const employee =
-    selectedEmployee?.id?.toString() === employeeId
-      ? selectedEmployee
-      : employees.find((item) => item.id?.toString() === employeeId)
+  const employeeFromList = employees.find(
+    (item) => item.id?.toString() === employeeId,
+  )
+  const employeeFromSelection =
+    selectedEmployee?.id?.toString() === employeeId ? selectedEmployee : null
+  const employee = employeeFromList ?? employeeFromSelection
 
   const videoRef = useRef(null)
   const signatureRef = useRef(null)
+  const activeStreamRef = useRef(null)
   const drawingStateRef = useRef({ isDrawing: false, lastX: 0, lastY: 0 })
 
+  const [loadingEmployee, setLoadingEmployee] = useState(false)
+  const [employeeError, setEmployeeError] = useState('')
   const [cameraReady, setCameraReady] = useState(false)
   const [capturedPhoto, setCapturedPhoto] = useState('')
+
+  const stopCameraStream = useCallback(() => {
+    const stream = activeStreamRef.current
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop())
+      activeStreamRef.current = null
+    }
+
+    if (videoRef.current?.srcObject) {
+      videoRef.current.srcObject = null
+    }
+  }, [])
+
+  useEffect(() => {
+    if (employee || employees.length > 0) return
+
+    let isCancelled = false
+
+    async function loadEmployeesForDetails() {
+      setLoadingEmployee(true)
+      setEmployeeError('')
+
+      try {
+        const records = await fetchEmployeesFromApi()
+        if (isCancelled) return
+        setEmployees(records)
+      } catch (requestError) {
+        if (isCancelled) return
+        setEmployeeError(
+          requestError instanceof Error
+            ? requestError.message
+            : 'Unable to load employee records',
+        )
+      } finally {
+        if (!isCancelled) {
+          setLoadingEmployee(false)
+        }
+      }
+    }
+
+    loadEmployeesForDetails()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [employee, employees.length, setEmployees])
 
   useEffect(() => {
     setSelectedEmployee(employee ?? null)
   }, [employee, setSelectedEmployee])
 
   useEffect(() => {
-    let mediaStream
+    stopCameraStream()
+    setCapturedPhoto('')
+    setCameraReady(false)
+    drawingStateRef.current = { isDrawing: false, lastX: 0, lastY: 0 }
+    if (!signatureRef.current) return
+    const context = signatureRef.current.getContext('2d')
+    context.clearRect(0, 0, signatureRef.current.width, signatureRef.current.height)
+  }, [employeeId, stopCameraStream])
+
+  useEffect(() => {
+    if (!employee || capturedPhoto) {
+      stopCameraStream()
+      setCameraReady(false)
+      return undefined
+    }
+
+    let isDisposed = false
 
     async function startCamera() {
       try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'user' },
           audio: false,
         })
 
-        if (!videoRef.current) return
+        if (isDisposed) {
+          mediaStream.getTracks().forEach((track) => track.stop())
+          return
+        }
+
+        activeStreamRef.current = mediaStream
+
+        if (!videoRef.current) {
+          mediaStream.getTracks().forEach((track) => track.stop())
+          activeStreamRef.current = null
+          setCameraReady(false)
+          return
+        }
+
         videoRef.current.srcObject = mediaStream
         await videoRef.current.play()
+
+        if (isDisposed) {
+          mediaStream.getTracks().forEach((track) => track.stop())
+          if (activeStreamRef.current === mediaStream) {
+            activeStreamRef.current = null
+          }
+          return
+        }
+
         setCameraReady(true)
       } catch {
-        setCameraReady(false)
+        if (!isDisposed) {
+          setCameraReady(false)
+        }
       }
     }
 
     startCamera()
 
     return () => {
-      if (!mediaStream) return
-      mediaStream.getTracks().forEach((track) => track.stop())
+      isDisposed = true
+      stopCameraStream()
     }
-  }, [])
+  }, [employee, capturedPhoto, stopCameraStream])
 
   // INTENTIONAL BUG: this listener is never cleaned up and can leak across mounts.
   useEffect(() => {
@@ -118,6 +216,8 @@ export function DetailsPage({ employeeId }) {
     const context = canvas.getContext('2d')
     context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height)
     setCapturedPhoto(canvas.toDataURL('image/png'))
+    stopCameraStream()
+    setCameraReady(false)
   }
 
   const clearSignature = () => {
@@ -156,7 +256,8 @@ export function DetailsPage({ employeeId }) {
   if (!employee) {
     return (
       <section className="card">
-        <h2>Employee not found</h2>
+        <h2>{loadingEmployee ? 'Loading employee...' : 'Employee not found'}</h2>
+        {employeeError ? <p className="error">{employeeError}</p> : null}
         <button type="button" onClick={() => navigate('/list')}>
           Back to list
         </button>

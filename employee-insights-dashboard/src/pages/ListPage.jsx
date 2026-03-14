@@ -1,29 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useAppData } from '../context/AppDataContext'
 import { navigate } from '../utils/router'
+import { fetchEmployeesFromApi } from '../utils/employeeData'
 
 const ROW_HEIGHT = 64
 const VIEWPORT_HEIGHT = 480
 const BUFFER_ROWS = 6
-
-function normalizeEmployee(record, index) {
-  return {
-    id:
-      record.id ??
-      record.employee_id ??
-      record.empId ??
-      `${record.name ?? record.first_name ?? 'employee'}-${index}`,
-    name:
-      record.name ??
-      [record.first_name, record.last_name].filter(Boolean).join(' ') ??
-      'Unknown Employee',
-    city: record.city ?? record.location ?? 'Unknown',
-    salary: Number(record.salary ?? record.monthly_salary ?? record.ctc ?? 0),
-    department: record.department ?? record.team ?? 'General',
-    email: record.email ?? 'n/a',
-    raw: record,
-  }
-}
 
 export function ListPage() {
   const { employees, setEmployees, setSelectedEmployee } = useAppData()
@@ -40,31 +22,14 @@ export function ListPage() {
       setError('')
 
       try {
-        const response = await fetch(
-          'https://backend.jotish.in/backend_dev/gettabledata.php',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: 'test', password: '123456' }),
-          },
-        )
-
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`)
-        }
-
-        const payload = await response.json()
-        const records = Array.isArray(payload)
-          ? payload
-          : Array.isArray(payload.data)
-            ? payload.data
-            : Array.isArray(payload.result)
-              ? payload.result
-              : []
-
-        setEmployees(records.map(normalizeEmployee))
+        const records = await fetchEmployeesFromApi()
+        setEmployees(records)
       } catch (requestError) {
-        setError(requestError.message)
+        setError(
+          requestError instanceof Error
+            ? requestError.message
+            : 'Unable to load employee records',
+        )
       } finally {
         setLoading(false)
       }
@@ -104,6 +69,7 @@ export function ListPage() {
 
       {loading ? <p>Loading employee records...</p> : null}
       {error ? <p className="error">{error}</p> : null}
+      {!loading && !error && employees.length === 0 ? <p>No employee records found.</p> : null}
 
       <div
         ref={viewportRef}

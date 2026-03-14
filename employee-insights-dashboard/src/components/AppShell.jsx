@@ -1,4 +1,5 @@
 import { useAuth } from '../context/AuthContext'
+import { useAppData } from '../context/AppDataContext'
 import { navigate } from '../utils/router'
 
 const links = [
@@ -8,6 +9,7 @@ const links = [
 
 export function AppShell({ children, path }) {
   const { isAuthenticated, username, logout } = useAuth()
+  const { setSelectedEmployee, setMergedImage } = useAppData()
 
   return (
     <div className="app-shell">
@@ -25,6 +27,8 @@ export function AppShell({ children, path }) {
               className="secondary"
               onClick={() => {
                 logout()
+                setSelectedEmployee(null)
+                setMergedImage('')
                 navigate('/login')
               }}
             >

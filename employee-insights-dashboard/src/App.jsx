@@ -43,7 +43,7 @@ function RouterView() {
     const employeeId = path.split('/details/')[1]
     return (
       <AppShell path={path}>
-        <DetailsPage employeeId={employeeId} />
+        <DetailsPage key={employeeId} employeeId={employeeId} />
       </AppShell>
     )
   }

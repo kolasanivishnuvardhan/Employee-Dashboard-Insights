@@ -255,7 +255,18 @@ button.secondary {
 
 .map-svg text {
   fill: #1e293b;
-  font-size: 6px;
+  font-size: 10px;
+}
+
+.map-grid-line {
+  stroke: rgba(30, 64, 175, 0.22);
+  stroke-width: 1;
+}
+
+.map-note {
+  margin: 0.5rem 0 0;
+  color: #475569;
+  font-size: 0.82rem;
 }
 
 @media (max-width: 900px) {

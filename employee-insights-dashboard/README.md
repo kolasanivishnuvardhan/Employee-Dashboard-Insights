@@ -17,6 +17,8 @@ A 4-screen React dashboard focused on auth, virtualization, native camera captur
 - Fetches employee data using:
   - `POST https://backend.jotish.in/backend_dev/gettabledata.php`
   - payload `{ "username": "test", "password": "123456" }`
+- Handles nested backend response shapes (including `TABLE_DATA.data`) and normalizes row-array records into typed employee objects.
+- Parses salary strings such as `$320,800` into numeric values for virtualization and analytics.
 - Custom virtualization (no windowing libraries): only viewport rows + buffer are rendered.
 
 ### 3) Identity Verification (`/details/:id`)
@@ -27,7 +29,7 @@ A 4-screen React dashboard focused on auth, virtualization, native camera captur
 ### 4) Analytics + Audit Result (`/analytics`)
 - Displays merged audit image.
 - Custom salary chart drawn with raw SVG bars.
-- Custom geospatial city map via SVG shape + city coordinate points.
+- Custom geospatial city map via raw SVG using latitude/longitude projection to SVG coordinates.
 
 ## Virtualization math (core logic)
 - `ROW_HEIGHT = 64`
